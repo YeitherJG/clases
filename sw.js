@@ -1,21 +1,59 @@
-const CACHE_NAME = "clases-cache-v2";
+const CACHE = "clases-cache-v1";
+const BASE = "/clases";
 const ASSETS = [
-  "/",              // importante para navegación
-  "/index.html",
-  "/style.css",
-  "/app.js",
-  "/manifest.json",
-  "/sql-wasm.js",   // local, no CDN
-  "/sql-wasm.wasm"  // local, no CDN
+  `${BASE}/`,
+  `${BASE}/index.html`,
+  `${BASE}/style.css`,
+  `${BASE}/app.js`,
+  `${BASE}/manifest.json`,
+  `${BASE}/sql-wasm.js`,
+  `${BASE}/sql-wasm.wasm`,
+  `${BASE}/icon-192.png`,
+  `${BASE}/icon-512.png`
 ];
 
-// Instalación: cachea todo y activa de inmediato
-self.addEventListener("install", event => {
+self.addEventListener("install", e => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+});
+
+self.addEventListener("activate", e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.map(k => (k !== CACHE ? caches.delete(k) : null)))
+    )
+  );
+  clients.claim();
+});
+
+self.addEventListener("fetch", e => {
+  const req = e.request;
+
+  // Navegación: devolver index.html del caché como fallback
+  if (req.mode === "navigate") {
+    e.respondWith(
+      caches.match(`${BASE}/index.html`).then(cached => {
+        return cached || fetch(req).catch(() => caches.match(`${BASE}/index.html`));
+      })
+    );
+    return;
+  }
+
+  // Recursos: offline-first con actualización en segundo plano
+  e.respondWith(
+    caches.match(req).then(cached => {
+      if (cached) return cached;
+      return fetch(req).then(res => {
+        const copy = res.clone();
+        if (res.ok && (res.type === "basic" || res.type === "cors")) {
+          caches.open(CACHE).then(c => c.put(req, copy));
+        }
+        return res;
+      }).catch(() => cached);
+    })
   );
 });
+
 
 // Activación: limpia versiones viejas y toma control
 self.addEventListener("activate", event => {
