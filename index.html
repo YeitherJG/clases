@@ -1,1 +1,48 @@
-<h1>Te amo Nicolle y Aleia</h1>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Gestión de Clases</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="./style.css">
+  <!-- Manifest para PWA -->
+  <link rel="manifest" href="./manifest.json">
+</head>
+<body>
+  <main class="page">
+    <h1>Gestión de Clases</h1>
+
+    <!-- Formulario para agregar clase -->
+    <section class="panel">
+      <h2>Agregar clase</h2>
+      <form id="formClase" autocomplete="off">
+        <div class="grid">
+          <input type="text" id="carrera" placeholder="Carrera" required>
+          <input type="text" id="seccion" placeholder="Sección" required>
+          <select id="turno" required>
+            <option value="" disabled selected>Seleccione turno</option>
+            <option value="Mañana">Mañana</option>
+            <option value="Tarde">Tarde</option>
+            <option value="Noche">Noche</option>
+          </select>
+          <input type="text" id="institucion" placeholder="Institución" required>
+        </div>
+        <button type="submit" class="btn">➕ Agregar clase</button>
+      </form>
+    </section>
+
+    <!-- Contenedor de clases -->
+    <section class="panel">
+      <h2>Clases registradas</h2>
+      <div id="clases" class="clases-grid"></div>
+    </section>
+  </main>
+
+  <!-- Librería SQL.js desde CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+  <!-- Tu app -->
+  <script src="./app.js"></script>
+</body>
+</html>
