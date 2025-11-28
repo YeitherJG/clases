@@ -49,38 +49,53 @@ navigator.serviceWorker.register("/sw.js")
  .then(reg => console.log("SW registrado:", reg.scope))
  .catch(err => console.error("Error SW:", err));
 }
-
 // =========================
-// Inicialización SQL.js
+// Inicialización SQL.js con nueva estructura
 // =========================
 initSqlJs({
-locateFile: () => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.wasm`
+  locateFile: () => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.wasm`
 }).then(SQL => {
-db = loadDB(SQL);
+  db = loadDB(SQL);
 
-db.run(`
- CREATE TABLE IF NOT EXISTS clases (
-   id INTEGER PRIMARY KEY AUTOINCREMENT,
-   carrera TEXT NOT NULL,
-   seccion TEXT NOT NULL,
-   turno TEXT NOT NULL,
-   institucion TEXT NOT NULL
- );
-`);
+  // Tabla de materias (información estable)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS materias (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      carrera TEXT NOT NULL,        -- Ej: Ingeniería de Software
+      institucion TEXT NOT NULL     -- Ej: Universidad X
+      -- opcional: nombre si dictas varias materias dentro de la misma carrera
+    );
+  `);
 
-db.run(`
- CREATE TABLE IF NOT EXISTS estudiantes (
-   id INTEGER PRIMARY KEY AUTOINCREMENT,
-   clase_id INTEGER NOT NULL,
-   nombre TEXT NOT NULL,
-   apellido TEXT NOT NULL,
-   cedula TEXT NOT NULL,
-   estrellas INTEGER DEFAULT 0,
-   FOREIGN KEY(clase_id) REFERENCES clases(id)
- );
-`);
+  // Tabla de clases (sesiones puntuales de una materia en una fecha)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS clases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      materia_id INTEGER NOT NULL,  -- Relación con la materia
+      nombre TEXT NOT NULL,         -- Ej: "Clase sobre integrales"
+      fecha TEXT NOT NULL,          -- Ej: "2025-11-28"
+      grupo TEXT,                   -- Ej: "Grupo 3"
+      seccion TEXT,                 -- Ej: "Sección 114"
+      FOREIGN KEY(materia_id) REFERENCES materias(id)
+    );
+  `);
 
-renderClases();
+  // Tabla de estudiantes (asociados a una clase puntual)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS estudiantes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clase_id INTEGER NOT NULL,    -- Relación con la clase del día
+      nombre TEXT NOT NULL,
+      apellido TEXT NOT NULL,
+      cedula TEXT NOT NULL,
+      estrellas INTEGER DEFAULT 0,
+      FOREIGN KEY(clase_id) REFERENCES clases(id)
+    );
+  `);
+
+  // Render inicial (puedes cambiar a renderMaterias si decides mostrar primero las materias)
+  renderMaterias();
+
 }).catch(err => {
 console.error("Error inicializando SQL.js:", err);
 });
@@ -110,70 +125,156 @@ saveDB();
 renderClases();
 e.target.reset();
 });
-
 // =========================
-// Render: clases + estudiantes
+// Render: materias → clases → estudiantes
 // =========================
-function renderClases() {
-const res = db.exec(`SELECT id, carrera, seccion, turno, institucion FROM clases ORDER BY id DESC`);
-const container = document.getElementById("clases");
-container.innerHTML = "";
+function renderMaterias() {
+  const res = db.exec(`SELECT id, carrera, institucion FROM materias ORDER BY id DESC`);
+  const container = document.getElementById("materias");
+  container.innerHTML = "";
 
-if (res.length === 0) {
- container.innerHTML = "<p class='meta'>No hay clases registradas aún.</p>";
- return;
+  if (res.length === 0) {
+    container.innerHTML = "<p class='meta'>No hay materias registradas aún.</p>";
+    return;
+  }
+
+  res[0].values.forEach(row => {
+    const [materiaId, carrera, institucion] = row;
+
+    const card = document.createElement("div");
+    card.className = "materia-card";
+    card.innerHTML = `
+      <h3>${escapeHtml(carrera)}</h3>
+      <p class="meta">Institución: ${escapeHtml(institucion)}</p>
+      <div class="acciones">
+        <button class="edit-materia" data-id="${materiaId}">✏️ Editar</button>
+        <button class="delete-materia" data-id="${materiaId}">🗑️ Eliminar</button>
+      </div>
+    `;
+
+    // Formulario para agregar clase dentro de la materia
+    const formClase = document.createElement("form");
+    formClase.className = "form-clase";
+    formClase.innerHTML = `
+      <input type="text" name="nombre" placeholder="Nombre de la clase" required>
+      <input type="date" name="fecha" required>
+      <input type="text" name="grupo" placeholder="Grupo">
+      <input type="text" name="seccion" placeholder="Sección">
+      <button type="submit">Agregar clase</button>
+    `;
+    formClase.addEventListener("submit", e => {
+      e.preventDefault();
+      const nombre = formClase.nombre.value.trim();
+      const fecha = formClase.fecha.value;
+      const grupo = formClase.grupo.value.trim();
+      const seccion = formClase.seccion.value.trim();
+
+      db.run(
+        `INSERT INTO clases (materia_id, nombre, fecha, grupo, seccion) VALUES (?, ?, ?, ?, ?)`,
+        [materiaId, nombre, fecha, grupo, seccion]
+      );
+      saveDB();
+      renderMaterias();
+    });
+    card.appendChild(formClase);
+
+    // Lista de clases de la materia
+    const clasesRes = db.exec(`
+      SELECT id, nombre, fecha, grupo, seccion
+      FROM clases
+      WHERE materia_id = ${materiaId}
+      ORDER BY fecha DESC
+    `);
+
+    if (clasesRes.length > 0 && clasesRes[0].values.length > 0) {
+      const listaClases = document.createElement("div");
+      listaClases.className = "clases-lista";
+
+      clasesRes[0].values.forEach(cl => {
+        const [claseId, nombreClase, fecha, grupo, seccion] = cl;
+        const claseCard = document.createElement("div");
+        claseCard.className = "clase-card";
+        claseCard.innerHTML = `
+          <h4>${escapeHtml(nombreClase)}</h4>
+          <p class="meta">Fecha: ${fecha} · Grupo: ${grupo || "-"} · Sección: ${seccion || "-"}</p>
+          <div class="acciones">
+            <button class="edit-clase" data-id="${claseId}">✏️ Editar</button>
+            <button class="delete-clase" data-id="${claseId}">🗑️ Eliminar</button>
+          </div>
+        `;
+
+        // Formulario para estudiantes dentro de la clase
+        const formEst = document.createElement("form");
+        formEst.className = "form-estudiante";
+        formEst.innerHTML = `
+          <input type="text" name="nombre" placeholder="Nombre" required>
+          <input type="text" name="apellido" placeholder="Apellido" required>
+          <input type="text" name="cedula" placeholder="Cédula" required>
+          <button type="submit">Agregar estudiante</button>
+        `;
+        formEst.addEventListener("submit", e => {
+          e.preventDefault();
+          const nombre = formEst.nombre.value.trim();
+          const apellido = formEst.apellido.value.trim();
+          const cedula = formEst.cedula.value.trim();
+
+          db.run(
+            `INSERT INTO estudiantes (clase_id, nombre, apellido, cedula) VALUES (?, ?, ?, ?)`,
+            [claseId, nombre, apellido, cedula]
+          );
+          saveDB();
+          renderMaterias();
+        });
+        claseCard.appendChild(formEst);
+
+        // Lista de estudiantes
+        const estRes = db.exec(`
+          SELECT id, nombre, apellido, cedula, estrellas
+          FROM estudiantes
+          WHERE clase_id = ${claseId}
+          ORDER BY id DESC
+        `);
+
+        if (estRes.length > 0 && estRes[0].values.length > 0) {
+          const listaEst = document.createElement("div");
+          listaEst.className = "estudiantes-lista";
+
+          estRes[0].values.forEach(est => {
+            const [eid, nombre, apellido, cedula, estrellas] = est;
+            let estrellasHTML = "";
+            for (let i = 0; i < estrellas; i++) estrellasHTML += "⭐";
+
+            const item = document.createElement("div");
+            item.className = "estudiante-card";
+            item.innerHTML = `
+              <h4>${escapeHtml(nombre)} ${escapeHtml(apellido)}</h4>
+              <p class="meta">Cédula: ${escapeHtml(cedula)}</p>
+              <div class="stars" data-id="${eid}">
+                <button class="star-btn remove-star" type="button">−</button>
+                <span class="meta star-display">${estrellasHTML} (${estrellas})</span>
+                <button class="star-btn add-star" type="button">+</button>
+              </div>
+              <div class="acciones">
+                <button class="edit-estudiante" data-id="${eid}">✏️ Editar</button>
+                <button class="delete-estudiante" data-id="${eid}">🗑️ Eliminar</button>
+              </div>
+            `;
+            listaEst.appendChild(item);
+          });
+
+          claseCard.appendChild(listaEst);
+        }
+
+        listaClases.appendChild(claseCard);
+      });
+
+      card.appendChild(listaClases);
+    }
+
+    container.appendChild(card);
+  });
 }
 
-res[0].values.forEach(row => {
- const [id, carrera, seccion, turno, institucion] = row;
-
- const card = document.createElement("div");
- card.className = "clase-card";
- card.innerHTML = `
-   <h3>${escapeHtml(carrera)}</h3>
-   <p class="meta">Institución: ${escapeHtml(institucion)}</p>
-   <p class="meta">Sección ${escapeHtml(seccion)} · ${escapeHtml(turno)}</p>
-   <div class="acciones">
-     <button class="edit-clase" data-id="${id}">✏️ Editar</button>
-     <button class="delete-clase" data-id="${id}">🗑️ Eliminar</button>
-   </div>
- `;
-
- // Formulario interno para estudiantes
- const form = document.createElement("form");
- form.className = "form-estudiante";
- form.innerHTML = `
-   <input type="text" name="nombre" placeholder="Nombre" required>
-   <input type="text" name="apellido" placeholder="Apellido" required>
-   <input type="text" name="cedula" placeholder="Cédula" required>
-   <button type="submit">Agregar estudiante</button>
- `;
- form.addEventListener("submit", e => {
-   e.preventDefault();
-   const nombre = form.nombre.value.trim();
-   const apellido = form.apellido.value.trim();
-   const cedula = form.cedula.value.trim();
-
-   if (!nombre || !apellido || !cedula) return;
-
-   db.run(
-     `INSERT INTO estudiantes (clase_id, nombre, apellido, cedula) VALUES (?, ?, ?, ?)`,
-     [id, nombre, apellido, cedula]
-   );
-
-   saveDB();
-   renderClases();
- });
-
- card.appendChild(form);
-
- // Lista de estudiantes por clase
- const estRes = db.exec(`
-   SELECT id, clase_id, nombre, apellido, cedula, estrellas
-   FROM estudiantes
-   WHERE clase_id = ${id}
-   ORDER BY id DESC
- `);
 
  if (estRes.length > 0 && estRes[0].values.length > 0) {
    const lista = document.createElement("div");
@@ -223,8 +324,6 @@ res[0].values.forEach(row => {
  }
 
  container.appendChild(card);
-});
-}
 
 // Escapar para seguridad mínima
 function escapeHtml(s = "") {
