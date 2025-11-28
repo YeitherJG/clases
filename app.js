@@ -122,7 +122,7 @@ db.run(
 );
 
 saveDB();
-renderClases();
+renderMaterias();
 e.target.reset();
 });
 // =========================
@@ -469,3 +469,4 @@ if (removeBtn) removeBtn.disabled = estrellas === 0;
 // =========================
 // Fin del archivo
 // =========================
+
