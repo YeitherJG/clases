@@ -14,34 +14,27 @@
   <main class="page">
     <h1>Gestión de Clases</h1>
 
-    <!-- Formulario para agregar clase -->
+    <!-- Formulario para agregar materia -->
     <section class="panel">
-      <h2>Agregar clase</h2>
-      <form id="formClase" autocomplete="off">
+      <h2>Agregar materia</h2>
+      <form id="formMateria" autocomplete="off">
         <div class="grid">
-          <input type="text" id="carrera" placeholder="Carrera" required>
-          <input type="text" id="seccion" placeholder="Sección" required>
-          <select id="turno" required>
-            <option value="" disabled selected>Seleccione turno</option>
-            <option value="Mañana">Mañana</option>
-            <option value="Tarde">Tarde</option>
-            <option value="Noche">Noche</option>
-          </select>
+          <input type="text" id="carrera" placeholder="Carrera / Materia" required>
           <input type="text" id="institucion" placeholder="Institución" required>
         </div>
-        <button type="submit" class="btn">➕ Agregar clase</button>
+        <button type="submit" class="btn">➕ Agregar materia</button>
       </form>
     </section>
 
-    <!-- Contenedor de clases -->
+    <!-- Contenedor de materias -->
     <section class="panel">
-      <h2>Clases registradas</h2>
-      <div id="clases" class="clases-grid"></div>
+      <h2>Materias registradas</h2>
+      <div id="materias" class="materias-grid"></div>
     </section>
   </main>
 
-  <!-- Librería SQL.js desde CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+  <!-- Librería SQL.js -->
+  <script src="./sql-wasm.js"></script>
   <!-- Tu app -->
   <script src="./app.js"></script>
 </body>
