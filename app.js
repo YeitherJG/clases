@@ -233,33 +233,49 @@ function renderMaterias() {
         if (estRes.length > 0 && estRes[0].values.length > 0) {
           const listaEst = document.createElement("div");
           listaEst.className = "estudiantes-lista";
-        
+
           estRes[0].values.forEach(est => {
             const [eid, nombre, apellido, cedula, estrellas] = est;
             let estrellasHTML = "";
             for (let i = 0; i < estrellas; i++) estrellasHTML += "⭐";
-        
+
             const item = document.createElement("div");
             item.className = "estudiante-card";
             item.innerHTML = `
               <h4>${escapeHtml(nombre)} ${escapeHtml(apellido)}</h4>
               <p class="meta">Cédula: ${escapeHtml(cedula)}</p>
               <div class="stars" data-id="${eid}">
-                <button class="star-btn remove-star" type="button" aria-label="Quitar estrella">−</button>
-                <span class="meta star-display">${estrellasHTML} (${estrellas})</span>
-                <button class="star-btn add-star" type="button" aria-label="Agregar estrella">+</button>
-              </div>
-              <div class="acciones">
-                <button class="edit-estudiante" data-id="${eid}">✏️ Editar</button>
-                <button class="delete-estudiante" data-id="${eid}">🗑️ Eliminar</button>
-              </div>
-            `;
-            listaEst.appendChild(item);
-          }); // ← aquí va el cierre correcto del forEach
-          card.appendChild(listaEst); // ← no olvides añadir la lista al card
-        } else {
-          const empty = document.createElement("p");
-          empty.className = "meta";
-          empty.textContent = "No hay estudiantes en esta clase aún.";
-          card.appendChild(empty);
-        }
+              <button class="star-btn remove-star" type="button" aria-label="Quitar estrella">−</button>
+              <span class="meta star-display">${estrellasHTML} (${estrellas})</span>
+              <button class="star-btn add-star" type="button" aria-label="Agregar estrella">+</button>
+            </div>
+            <div class="acciones">
+              <button class="edit-estudiante" data-id="${eid}">✏️ Editar</button>
+              <button class="delete-estudiante" data-id="${eid}">🗑️ Eliminar</button>
+            </div>
+          `;
+          listaEst.appendChild(item);
+        }); // cierre del forEach de estudiantes
+
+        claseCard.appendChild(listaEst);
+      } else {
+        const emptyEst = document.createElement("p");
+        emptyEst.className = "meta";
+        emptyEst.textContent = "No hay estudiantes en esta clase aún.";
+        claseCard.appendChild(emptyEst);
+      }
+
+      listaClases.appendChild(claseCard);
+    }); // cierre del forEach de clases
+
+    card.appendChild(listaClases);
+  } else {
+    const emptyClase = document.createElement("p");
+    emptyClase.className = "meta";
+    emptyClase.textContent = "No hay clases registradas aún.";
+    card.appendChild(emptyClase);
+  }
+
+  container.appendChild(card);
+}); // cierre del forEach de materias
+} // cierre de la función renderMaterias
