@@ -279,3 +279,16 @@ function renderMaterias() {
   container.appendChild(card);
 }); // cierre del forEach de materias
 } // cierre de la función renderMaterias
+
+// =========================
+// Escapar texto para seguridad mínima (evita inyección HTML)
+// =========================
+function escapeHtml(s = "") {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+}
