@@ -124,175 +124,191 @@ document.getElementById("formMateria").addEventListener("submit", e => {
 // Render: materias → clases → estudiantes
 // =========================
 function renderMaterias() {
-  const res = db.exec(`SELECT id, carrera, institucion FROM materias ORDER BY id DESC`);
-  const container = document.getElementById("materias");
-  container.innerHTML = "";
+  console.log("Renderizando materias...");  // Log para depuración
+  try {
+    const res = db.exec(`SELECT id, carrera, institucion FROM materias ORDER BY id DESC`);
+    console.log("Materias encontradas:", res);  // Log para ver si se recuperan
+    const container = document.getElementById("materias");
+    container.innerHTML = "";
 
-  if (res.length === 0) {
-    container.innerHTML = "<p class='meta'>No hay materias registradas aún.</p>";
-    return;
-  }
-
-  res[0].values.forEach(row => {
-    const [materiaId, carrera, institucion] = row;
-
-    const card = document.createElement("div");
-    card.className = "materia-card";
-    card.innerHTML = `
-      <h3>${escapeHtml(carrera)}</h3>
-      <p class="meta">Institución: ${escapeHtml(institucion)}</p>
-      <div class="acciones">
-        <button class="edit-materia" data-id="${materiaId}">✏️ Editar</button>
-        <button class="delete-materia" data-id="${materiaId}">🗑️ Eliminar</button>
-      </div>
-    `;
-
-    // Formulario para agregar clase dentro de la materia
-    const formClase = document.createElement("form");
-    formClase.className = "form-clase";
-    formClase.innerHTML = `
-      <input type="text" name="nombre" placeholder="Nombre de la clase" required>
-      <input type="date" name="fecha" required>
-      <input type="text" name="grupo" placeholder="Grupo">
-      <input type="text" name="seccion" placeholder="Sección">
-      <button type="submit">Agregar clase</button>
-    `;
-    formClase.addEventListener("submit", e => {
-      e.preventDefault();
-      const nombre = formClase.nombre.value.trim();
-      const fecha = formClase.fecha.value;
-      const grupo = formClase.grupo.value.trim();
-      const seccion = formClase.seccion.value.trim();
-
-      if (!nombre || !fecha) {
-        alert("Completa nombre y fecha de la clase");
-        return;
-      }
-
-      db.run(
-        `INSERT INTO clases (materia_id, nombre, fecha, grupo, seccion) VALUES (?, ?, ?, ?, ?)`,
-        [materiaId, nombre, fecha, grupo, seccion]
-      );
-      saveDB();
-      renderMaterias();
-    });
-    card.appendChild(formClase);
-
-    // Lista de clases de la materia
-    const clasesRes = db.exec(`
-      SELECT id, nombre, fecha, grupo, seccion
-      FROM clases
-      WHERE materia_id = ${materiaId}
-      ORDER BY fecha DESC
-    `);
-
-    if (clasesRes.length > 0 && clasesRes[0].values.length > 0) {
-      const listaClases = document.createElement("div");
-      listaClases.className = "clases-lista";
-
-      clasesRes[0].values.forEach(cl => {
-        const [claseId, nombreClase, fecha, grupo, seccion] = cl;
-        const claseCard = document.createElement("div");
-        claseCard.className = "clase-card";
-        claseCard.innerHTML = `
-          <h4>${escapeHtml(nombreClase)}</h4>
-          <p class="meta">Fecha: ${fecha} · Grupo: ${grupo || "-"} · Sección: ${seccion || "-"}</p>
-          <div class="acciones">
-            <button class="edit-clase" data-id="${claseId}">✏️ Editar</button>
-            <button class="delete-clase" data-id="${claseId}">🗑️ Eliminar</button>
-          </div>
-        `;
-
-        // Formulario para estudiantes dentro de la clase
-        const formEst = document.createElement("form");
-        formEst.className = "form-estudiante";
-        formEst.innerHTML = `
-          <input type="text" name="nombre" placeholder="Nombre" required>
-          <input type="text" name="apellido" placeholder="Apellido" required>
-          <input type="text" name="cedula" placeholder="Cédula" required>
-          <button type="submit">Agregar estudiante</button>
-        `;
-        formEst.addEventListener("submit", e => {
-          e.preventDefault();
-          const nombre = formEst.nombre.value.trim();
-          const apellido = formEst.apellido.value.trim();
-          const cedula = formEst.cedula.value.trim();
-
-          if (!nombre || !apellido || !cedula) {
-            alert("Completa todos los campos del estudiante");
-            return;
-          }
-
-          try {
-            db.run(
-              `INSERT INTO estudiantes (clase_id, nombre, apellido, cedula) VALUES (?, ?, ?, ?)`,
-              [claseId, nombre, apellido, cedula]
-            );
-            saveDB();
-            renderMaterias();
-          } catch (err) {
-            alert("Error: Cédula ya existe o problema en DB");
-          }
-        });
-        claseCard.appendChild(formEst);
-
-        // Lista de estudiantes
-        const estRes = db.exec(`
-          SELECT id, nombre, apellido, cedula, estrellas
-          FROM estudiantes
-          WHERE clase_id = ${claseId}
-          ORDER BY id DESC
-        `);
-
-        if (estRes.length > 0 && estRes[0].values.length > 0) {
-          const listaEst = document.createElement("div");
-          listaEst.className = "estudiantes-lista";
-
-          estRes[0].values.forEach(est => {
-            const [eid, nombre, apellido, cedula, estrellas] = est;
-            let estrellasHTML = "";
-            for (let i = 0; i < estrellas; i++) estrellasHTML += "⭐";
-            const nota = calcularNota(estrellas);  // Calcula la nota
-
-            const item = document.createElement("div");
-            item.className = "estudiante-card";
-            item.innerHTML = `
-              <h4>${escapeHtml(nombre)} ${escapeHtml(apellido)}</h4>
-              <p class="meta">Cédula: ${escapeHtml(cedula)}</p>
-              <div class="stars" data-id="${eid}">
-                <button class="star-btn remove-star" type="button" aria-label="Quitar estrella">−</button>
-                <span class="meta star-display">${estrellasHTML} (${estrellas}) - Nota: ${nota}</span>
-                <button class="star-btn add-star" type="button" aria-label="Agregar estrella">+</button>
-              </div>
-              <div class="acciones">
-                <button class="edit-estudiante" data-id="${eid}">✏️ Editar</button>
-                <button class="delete-estudiante" data-id="${eid}">🗑️ Eliminar</button>
-              </div>
-            `;
-            listaEst.appendChild(item);
-          });
-
-          claseCard.appendChild(listaEst);
-        } else {
-          const emptyEst = document.createElement("p");
-          emptyEst.className = "meta";
-          emptyEst.textContent = "No hay estudiantes en esta clase aún.";
-          claseCard.appendChild(emptyEst);
-        }
-
-        listaClases.appendChild(claseCard);
-      });
-
-      card.appendChild(listaClases);
-    } else {
-      const emptyClase = document.createElement("p");
-      emptyClase.className = "meta";
-      emptyClase.textContent = "No hay clases registradas aún.";
-      card.appendChild(emptyClase);
+    if (res.length === 0) {
+      container.innerHTML = "<p class='meta'>No hay materias registradas aún.</p>";
+      return;
     }
 
-    container.appendChild(card);
-  });
+    res[0].values.forEach(row => {
+      const [materiaId, carrera, institucion] = row;
+      console.log("Renderizando materia:", materiaId, carrera);  // Log por materia
+
+      const card = document.createElement("div");
+      card.className = "materia-card";
+      card.innerHTML = `
+        <h3>${escapeHtml(carrera)}</h3>
+        <p class="meta">Institución: ${escapeHtml(institucion)}</p>
+        <div class="acciones">
+          <button class="edit-materia" data-id="${materiaId}">✏️ Editar</button>
+          <button class="delete-materia" data-id="${materiaId}">🗑️ Eliminar</button>
+        </div>
+      `;
+
+      // Formulario para agregar clase dentro de la materia
+      const formClase = document.createElement("form");
+      formClase.className = "form-clase";
+      formClase.innerHTML = `
+        <input type="text" name="nombre" placeholder="Nombre de la clase" required>
+        <input type="date" name="fecha" required>
+        <input type="text" name="grupo" placeholder="Grupo">
+        <input type="text" name="seccion" placeholder="Sección">
+        <button type="submit">Agregar clase</button>
+      `;
+      formClase.addEventListener("submit", e => {
+        e.preventDefault();
+        const nombre = formClase.nombre.value.trim();
+        const fecha = formClase.fecha.value;
+        const grupo = formClase.grupo.value.trim();
+        const seccion = formClase.seccion.value.trim();
+
+        if (!nombre || !fecha) {
+          alert("Completa nombre y fecha de la clase");
+          return;
+        }
+
+        console.log("Agregando clase a materia:", materiaId);  // Log antes de insert
+        try {
+          db.run(
+            `INSERT INTO clases (materia_id, nombre, fecha, grupo, seccion) VALUES (?, ?, ?, ?, ?)`,
+            [materiaId, nombre, fecha, grupo, seccion]
+          );
+          console.log("Clase agregada exitosamente");  // Log después de insert
+          saveDB();
+          renderMaterias();
+        } catch (err) {
+          console.error("Error al agregar clase:", err);
+          alert("Error al agregar clase: " + err.message);
+        }
+      });
+      card.appendChild(formClase);
+
+      // Lista de clases de la materia
+      const clasesRes = db.exec(`
+        SELECT id, nombre, fecha, grupo, seccion
+        FROM clases
+        WHERE materia_id = ${materiaId}
+        ORDER BY fecha DESC
+      `);
+      console.log("Clases para materia", materiaId, ":", clasesRes);  // Log clases
+
+      if (clasesRes.length > 0 && clasesRes[0].values.length > 0) {
+        const listaClases = document.createElement("div");
+        listaClases.className = "clases-lista";
+
+        clasesRes[0].values.forEach(cl => {
+          const [claseId, nombreClase, fecha, grupo, seccion] = cl;
+          const claseCard = document.createElement("div");
+          claseCard.className = "clase-card";
+          claseCard.innerHTML = `
+            <h4>${escapeHtml(nombreClase)}</h4>
+            <p class="meta">Fecha: ${fecha} · Grupo: ${grupo || "-"} · Sección: ${seccion || "-"}</p>
+            <div class="acciones">
+              <button class="edit-clase" data-id="${claseId}">✏️ Editar</button>
+              <button class="delete-clase" data-id="${claseId}">🗑️ Eliminar</button>
+            </div>
+          `;
+
+          // Formulario para estudiantes dentro de la clase
+          const formEst = document.createElement("form");
+          formEst.className = "form-estudiante";
+          formEst.innerHTML = `
+            <input type="text" name="nombre" placeholder="Nombre" required>
+            <input type="text" name="apellido" placeholder="Apellido" required>
+            <input type="text" name="cedula" placeholder="Cédula" required>
+            <button type="submit">Agregar estudiante</button>
+          `;
+          formEst.addEventListener("submit", e => {
+            e.preventDefault();
+            const nombre = formEst.nombre.value.trim();
+            const apellido = formEst.apellido.value.trim();
+            const cedula = formEst.cedula.value.trim();
+
+            if (!nombre || !apellido || !cedula) {
+              alert("Completa todos los campos del estudiante");
+              return;
+            }
+
+            try {
+              db.run(
+                `INSERT INTO estudiantes (clase_id, nombre, apellido, cedula) VALUES (?, ?, ?, ?)`,
+                [claseId, nombre, apellido, cedula]
+              );
+              saveDB();
+              renderMaterias();
+            } catch (err) {
+              alert("Error: Cédula ya existe o problema en DB");
+            }
+          });
+          claseCard.appendChild(formEst);
+
+          // Lista de estudiantes
+          const estRes = db.exec(`
+            SELECT id, nombre, apellido, cedula, estrellas
+            FROM estudiantes
+            WHERE clase_id = ${claseId}
+            ORDER BY id DESC
+          `);
+
+          if (estRes.length > 0 && estRes[0].values.length > 0) {
+            const listaEst = document.createElement("div");
+            listaEst.className = "estudiantes-lista";
+
+            estRes[0].values.forEach(est => {
+              const [eid, nombre, apellido, cedula, estrellas] = est;
+              let estrellasHTML = "";
+              for (let i = 0; i < estrellas; i++) estrellasHTML += "⭐";
+              const nota = calcularNota(estrellas);  // Calcula la nota
+
+              const item = document.createElement("div");
+              item.className = "estudiante-card";
+              item.innerHTML = `
+                <h4>${escapeHtml(nombre)} ${escapeHtml(apellido)}</h4>
+                <p class="meta">Cédula: ${escapeHtml(cedula)}</p>
+                <div class="stars" data-id="${eid}">
+                  <button class="star-btn remove-star" type="button" aria-label="Quitar estrella">−</button>
+                  <span class="meta star-display">${estrellasHTML} (${estrellas}) - Nota: ${nota}</span>
+                  <button class="star-btn add-star" type="button" aria-label="Agregar estrella">+</button>
+                </div>
+                <div class="acciones">
+                  <button class="edit-estudiante" data-id="${eid}">✏️ Editar</button>
+                  <button class="delete-estudiante" data-id="${eid}">🗑️ Eliminar</button>
+                </div>
+              `;
+              listaEst.appendChild(item);
+            });
+
+            claseCard.appendChild(listaEst);
+          } else {
+            const emptyEst = document.createElement("p");
+            emptyEst.className = "meta";
+            emptyEst.textContent = "No hay estudiantes en esta clase aún.";
+            claseCard.appendChild(emptyEst);
+          }
+
+          listaClases.appendChild(claseCard);
+        });
+
+        card.appendChild(listaClases);
+      } else {
+        const emptyClase = document.createElement("p");
+        emptyClase.className = "meta";
+        emptyClase.textContent = "No hay clases registradas aún.";
+        card.appendChild(emptyClase);
+      }
+
+      container.appendChild(card);
+    });
+  } catch (err) {
+    console.error("Error en renderMaterias:", err);
+    alert("Error al renderizar: " + err.message);
+  }
 }
 
 // =========================
