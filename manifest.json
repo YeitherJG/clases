@@ -1,7 +1,7 @@
 {
   "name": "Gestión de Clases",
   "short_name": "Clases",
-  "id": "./clase/index.html", 
+  "id": "./index.html", 
   "start_url": "./clases/index.html", 
   "scope": "./", 
   "display": "standalone",
@@ -12,5 +12,6 @@
     { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" } 
   ]
 }
+
 
 
