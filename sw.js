@@ -1,13 +1,13 @@
 const CACHE_NAME = 'clases-app-v1';
 const urlsToCache = [
   './', 
-  './index.html',
-  './style.css',
-  './app.js',
-  './sql-wasm.js',
-  './sql-wasm.wasm', 
-  './icon-192.png', 
-  './icon-512.png' 
+  './clases/index.html',
+  './clases/style.css',
+  './clases/app.js',
+  './clases/sql-wasm.js',
+  './clases/sql-wasm.wasm', 
+  './clases/icon-192.png', 
+  './clases/icon-512.png' 
 ];
 
 
@@ -52,4 +52,5 @@ self.addEventListener('activate', event => {
     })
   );
 });
+
 
