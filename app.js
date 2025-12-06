@@ -54,6 +54,7 @@ function ensureTables() {
     db.run(`
       CREATE TABLE IF NOT EXISTS clases (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        materias_id INTEGER NOT NULL,
         nombre TEXT NOT NULL,
         fecha TEXT NOT NULL,
         grupo TEXT,
@@ -64,7 +65,7 @@ function ensureTables() {
     db.run(`
       CREATE TABLE IF NOT EXISTS estudiantes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        clase_id INTEGER NOT NULL,
+        clases_id INTEGER NOT NULL,
         nombre TEXT NOT NULL,
         apellido TEXT NOT NULL,
         cedula TEXT NOT NULL UNIQUE,
@@ -447,4 +448,5 @@ function escapeHtml(s = "") {
     "'": '&#39;'
   }[c]));
 }
+
 
