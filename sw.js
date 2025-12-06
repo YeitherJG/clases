@@ -1,13 +1,15 @@
 const CACHE_NAME = 'clases-app-v1';
 const urlsToCache = [
-  './', // Cachea la carpeta raíz (importante para el index.html)
+  './', 
   './index.html',
   './style.css',
   './app.js',
   './sql-wasm.js',
-  './sql-wasm.wasm', // ¡Crucial! El motor de la DB
-  // Aquí puedes añadir rutas a tus iconos si los tienes en manifest.json
+  './sql-wasm.wasm', 
+  './icon-192.png', 
+  './icon-512.png' 
 ];
+
 
 // 1. Instalar y Cachear todos los recursos
 self.addEventListener('install', event => {
@@ -50,3 +52,4 @@ self.addEventListener('activate', event => {
     })
   );
 });
+
