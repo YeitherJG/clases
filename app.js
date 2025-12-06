@@ -40,6 +40,45 @@ function loadDB(SQL) {
   return new SQL.Database();
 }
 
+// Función para asegurar que las tablas existan (útil si la DB cargada no las tiene)
+function ensureTables() {
+  try {
+    // Verifica y crea tablas si no existen
+    db.run(`
+      CREATE TABLE IF NOT EXISTS materias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        carrera TEXT NOT NULL,
+        institucion TEXT NOT NULL
+      );
+    `);
+    db.run(`
+      CREATE TABLE IF NOT EXISTS clases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        materia_id INTEGER NOT NULL,
+        nombre TEXT NOT NULL,
+        fecha TEXT NOT NULL,
+        grupo TEXT,
+        seccion TEXT,
+        FOREIGN KEY(materia_id) REFERENCES materias(id)
+      );
+    `);
+    db.run(`
+      CREATE TABLE IF NOT EXISTS estudiantes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        clase_id INTEGER NOT NULL,
+        nombre TEXT NOT NULL,
+        apellido TEXT NOT NULL,
+        cedula TEXT NOT NULL UNIQUE,
+        estrellas INTEGER DEFAULT 0,
+        FOREIGN KEY(clase_id) REFERENCES clases(id)
+      );
+    `);
+    console.log("Tablas verificadas/creadas exitosamente");
+  } catch (err) {
+    console.error("Error al asegurar tablas:", err);
+  }
+}
+
 // Registro del Service Worker
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js")
@@ -54,43 +93,7 @@ initSqlJs({
   locateFile: () => `./sql-wasm.wasm`  // Usa el archivo local en lugar de CDN
 }).then(SQL => {
   db = loadDB(SQL);
-
-  // Tabla de materias
-  db.run(`
-    CREATE TABLE IF NOT EXISTS materias (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      carrera TEXT NOT NULL,
-      institucion TEXT NOT NULL
-    );
-  `);
-
-  // Tabla de clases
-  db.run(`
-    CREATE TABLE IF NOT EXISTS clases (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      materia_id INTEGER NOT NULL,
-      nombre TEXT NOT NULL,
-      fecha TEXT NOT NULL,
-      grupo TEXT,
-      seccion TEXT,
-      FOREIGN KEY(materia_id) REFERENCES materias(id)
-    );
-  `);
-
-  // Tabla de estudiantes
-  db.run(`
-    CREATE TABLE IF NOT EXISTS estudiantes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      clase_id INTEGER NOT NULL,
-      nombre TEXT NOT NULL,
-      apellido TEXT NOT NULL,
-      cedula TEXT NOT NULL UNIQUE,  // Agregado UNIQUE para evitar duplicados
-      estrellas INTEGER DEFAULT 0,
-      FOREIGN KEY(clase_id) REFERENCES clases(id)
-    );
-  `);
-
-  // Render inicial
+  ensureTables();  // Asegura que las tablas existan
   renderMaterias();
 }).catch(err => {
   console.error("Error inicializando SQL.js:", err);
@@ -124,10 +127,10 @@ document.getElementById("formMateria").addEventListener("submit", e => {
 // Render: materias → clases → estudiantes
 // =========================
 function renderMaterias() {
-  console.log("Renderizando materias...");  // Log para depuración
+  console.log("Renderizando materias...");
   try {
     const res = db.exec(`SELECT id, carrera, institucion FROM materias ORDER BY id DESC`);
-    console.log("Materias encontradas:", res);  // Log para ver si se recuperan
+    console.log("Materias encontradas:", res);
     const container = document.getElementById("materias");
     container.innerHTML = "";
 
@@ -138,7 +141,7 @@ function renderMaterias() {
 
     res[0].values.forEach(row => {
       const [materiaId, carrera, institucion] = row;
-      console.log("Renderizando materia:", materiaId, carrera);  // Log por materia
+      console.log("Renderizando materia:", materiaId, carrera);
 
       const card = document.createElement("div");
       card.className = "materia-card";
@@ -173,13 +176,13 @@ function renderMaterias() {
           return;
         }
 
-        console.log("Agregando clase a materia:", materiaId);  // Log antes de insert
+        console.log("Agregando clase a materia:", materiaId);
         try {
           db.run(
             `INSERT INTO clases (materia_id, nombre, fecha, grupo, seccion) VALUES (?, ?, ?, ?, ?)`,
             [materiaId, nombre, fecha, grupo, seccion]
           );
-          console.log("Clase agregada exitosamente");  // Log después de insert
+          console.log("Clase agregada exitosamente");
           saveDB();
           renderMaterias();
         } catch (err) {
@@ -190,13 +193,19 @@ function renderMaterias() {
       card.appendChild(formClase);
 
       // Lista de clases de la materia
-      const clasesRes = db.exec(`
-        SELECT id, nombre, fecha, grupo, seccion
-        FROM clases
-        WHERE materia_id = ${materiaId}
-        ORDER BY fecha DESC
-      `);
-      console.log("Clases para materia", materiaId, ":", clasesRes);  // Log clases
+      let clasesRes = [];
+      try {
+        clasesRes = db.exec(`
+          SELECT id, nombre, fecha, grupo, seccion
+          FROM clases
+          WHERE materia_id = ${materiaId}
+          ORDER BY fecha DESC
+        `);
+        console.log("Clases para materia", materiaId, ":", clasesRes);
+      } catch (err) {
+        console.error("Error al consultar clases:", err);
+        // Si falla, asume que no hay clases
+      }
 
       if (clasesRes.length > 0 && clasesRes[0].values.length > 0) {
         const listaClases = document.createElement("div");
@@ -249,12 +258,23 @@ function renderMaterias() {
           claseCard.appendChild(formEst);
 
           // Lista de estudiantes
-          const estRes = db.exec(`
-            SELECT id, nombre, apellido, cedula, estrellas
-            FROM estudiantes
-            WHERE clase_id = ${claseId}
-            ORDER BY id DESC
-          `);
+          let estRes = [];
+          try {
+            estRes = db.exec(`
+              SELECT id, nombre, apellido, cedula, estrellas
+              FROM estudiantes
+              WHERE clase_id = ${claseId}
+              ORDER BY id DESC
+            `);
+          } catch (err) {
+            console.error("Error al consultar estudiantes (posiblemente tabla no existe):", err);
+            // Si falla, muestra mensaje de que no hay estudiantes
+            const emptyEst = document.createElement("p");
+            emptyEst.className = "meta";
+            emptyEst.textContent = "No hay estudiantes en esta clase aún (error en DB).";
+            claseCard.appendChild(emptyEst);
+            return;  // Salta al siguiente
+          }
 
           if (estRes.length > 0 && estRes[0].values.length > 0) {
             const listaEst = document.createElement("div");
@@ -264,7 +284,7 @@ function renderMaterias() {
               const [eid, nombre, apellido, cedula, estrellas] = est;
               let estrellasHTML = "";
               for (let i = 0; i < estrellas; i++) estrellasHTML += "⭐";
-              const nota = calcularNota(estrellas);  // Calcula la nota
+              const nota = calcularNota(estrellas);
 
               const item = document.createElement("div");
               item.className = "estudiante-card";
@@ -408,23 +428,4 @@ document.getElementById("materias").addEventListener("click", e => {
       const newApellido = prompt("Nuevo apellido:", apellido);
       const newCedula = prompt("Nueva cédula:", cedula);
       if (newNombre && newApellido && newCedula) {
-        db.run(`UPDATE estudiantes SET nombre = ?, apellido = ?, cedula = ? WHERE id = ?`, [newNombre.trim(), newApellido.trim(), newCedula.trim(), id]);
-        saveDB();
-        renderMaterias();
-      }
-    }
-  }
-});
-
-// =========================
-// Escapar texto para seguridad mínima (evita inyección HTML)
-// =========================
-function escapeHtml(s = "") {
-  return String(s).replace(/[&<>"']/g, c => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[c]));
-}
+        db.run(`UPDATE estudiantes SET nombre =
