@@ -1,14 +1,14 @@
 {
   "name": "Gestión de Clases",
   "short_name": "Clases",
-  "id": "/index.html",
-  "start_url": "/index.html",
-  "scope": "/",
+  "id": "./index.html", /* CAMBIADO: Ruta relativa */
+  "start_url": "./index.html", /* CAMBIADO: Ruta relativa */
+  "scope": "./", /* CAMBIADO: Ruta relativa */
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2196f3",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" }, /* CAMBIADO */
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" } /* CAMBIADO */
   ]
 }
