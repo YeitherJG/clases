@@ -421,4 +421,30 @@ document.getElementById("materias").addEventListener("click", e => {
   // Editar estudiante (simple prompt)
   else if (target.classList.contains("edit-estudiante")) {
     const id = target.dataset.id;
-    const res = db.exec(`SELECT nombre, apellido, cedula FROM
+    const res = db.exec(`SELECT nombre, apellido, cedula FROM estudiantes WHERE id = ?`, [id]);
+    if (res.length > 0) {
+      const [nombre, apellido, cedula] = res[0].values[0];
+      const newNombre = prompt("Nuevo nombre:", nombre);
+      const newApellido = prompt("Nuevo apellido:", apellido);
+      const newCedula = prompt("Nueva cédula:", cedula);
+      if (newNombre && newApellido && newCedula) {
+        db.run(`UPDATE estudiantes SET nombre = ?, apellido = ?, cedula = ? WHERE id = ?`, [newNombre.trim(), newApellido.trim(), newCedula.trim(), id]);
+        saveDB();
+        renderMaterias();
+      }
+    }
+  }
+});
+
+// =========================
+// Escapar texto para seguridad mínima (evita inyección HTML)
+// =========================
+function escapeHtml(s = "") {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+}
