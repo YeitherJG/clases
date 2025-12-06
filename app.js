@@ -79,9 +79,9 @@ function ensureTables() {
   }
 }
 
-// Registro del Service Worker
+// Registro del Service Worker (ajusta la ruta si sw.js no está en raíz)
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js")
+  navigator.serviceWorker.register("./sw.js")  // Cambia a "./sw.js" si está en la misma carpeta que index.html
     .then(reg => console.log("SW registrado:", reg.scope))
     .catch(err => console.error("Error SW:", err));
 }
@@ -421,11 +421,4 @@ document.getElementById("materias").addEventListener("click", e => {
   // Editar estudiante (simple prompt)
   else if (target.classList.contains("edit-estudiante")) {
     const id = target.dataset.id;
-    const res = db.exec(`SELECT nombre, apellido, cedula FROM estudiantes WHERE id = ?`, [id]);
-    if (res.length > 0) {
-      const [nombre, apellido, cedula] = res[0].values[0];
-      const newNombre = prompt("Nuevo nombre:", nombre);
-      const newApellido = prompt("Nuevo apellido:", apellido);
-      const newCedula = prompt("Nueva cédula:", cedula);
-      if (newNombre && newApellido && newCedula) {
-        db.run(`UPDATE estudiantes SET nombre =
+    const res = db.exec(`SELECT nombre, apellido, cedula FROM
