@@ -5,7 +5,7 @@ let db;
 // =========================
 // Utilidad: cálculo de nota
 // =========================
-function calcularNota(estrellas, maxEstrellas, minEstrellas) {
+function calcularNota(estrellas, maxEstrellas = 5, minEstrellas = 0) {  // Asumiendo max 5 estrellas por defecto
   if (estrellas === 0) return 1;
   if (estrellas === minEstrellas) return 12;
   if (estrellas === maxEstrellas) return 20;
@@ -48,10 +48,10 @@ if ("serviceWorker" in navigator) {
 }
 
 // =========================
-// Inicialización SQL.js con nueva estructura
+// Inicialización SQL.js con archivos locales
 // =========================
 initSqlJs({
-  locateFile: () => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.wasm`
+  locateFile: () => `./sql-wasm.wasm`  // Usa el archivo local en lugar de CDN
 }).then(SQL => {
   db = loadDB(SQL);
 
@@ -84,7 +84,7 @@ initSqlJs({
       clase_id INTEGER NOT NULL,
       nombre TEXT NOT NULL,
       apellido TEXT NOT NULL,
-      cedula TEXT NOT NULL,
+      cedula TEXT NOT NULL UNIQUE,  // Agregado UNIQUE para evitar duplicados
       estrellas INTEGER DEFAULT 0,
       FOREIGN KEY(clase_id) REFERENCES clases(id)
     );
@@ -164,6 +164,11 @@ function renderMaterias() {
       const grupo = formClase.grupo.value.trim();
       const seccion = formClase.seccion.value.trim();
 
+      if (!nombre || !fecha) {
+        alert("Completa nombre y fecha de la clase");
+        return;
+      }
+
       db.run(
         `INSERT INTO clases (materia_id, nombre, fecha, grupo, seccion) VALUES (?, ?, ?, ?, ?)`,
         [materiaId, nombre, fecha, grupo, seccion]
@@ -213,12 +218,21 @@ function renderMaterias() {
           const apellido = formEst.apellido.value.trim();
           const cedula = formEst.cedula.value.trim();
 
-          db.run(
-            `INSERT INTO estudiantes (clase_id, nombre, apellido, cedula) VALUES (?, ?, ?, ?)`,
-            [claseId, nombre, apellido, cedula]
-          );
-          saveDB();
-          renderMaterias();
+          if (!nombre || !apellido || !cedula) {
+            alert("Completa todos los campos del estudiante");
+            return;
+          }
+
+          try {
+            db.run(
+              `INSERT INTO estudiantes (clase_id, nombre, apellido, cedula) VALUES (?, ?, ?, ?)`,
+              [claseId, nombre, apellido, cedula]
+            );
+            saveDB();
+            renderMaterias();
+          } catch (err) {
+            alert("Error: Cédula ya existe o problema en DB");
+          }
         });
         claseCard.appendChild(formEst);
 
@@ -238,6 +252,7 @@ function renderMaterias() {
             const [eid, nombre, apellido, cedula, estrellas] = est;
             let estrellasHTML = "";
             for (let i = 0; i < estrellas; i++) estrellasHTML += "⭐";
+            const nota = calcularNota(estrellas);  // Calcula la nota
 
             const item = document.createElement("div");
             item.className = "estudiante-card";
@@ -245,40 +260,145 @@ function renderMaterias() {
               <h4>${escapeHtml(nombre)} ${escapeHtml(apellido)}</h4>
               <p class="meta">Cédula: ${escapeHtml(cedula)}</p>
               <div class="stars" data-id="${eid}">
-              <button class="star-btn remove-star" type="button" aria-label="Quitar estrella">−</button>
-              <span class="meta star-display">${estrellasHTML} (${estrellas})</span>
-              <button class="star-btn add-star" type="button" aria-label="Agregar estrella">+</button>
-            </div>
-            <div class="acciones">
-              <button class="edit-estudiante" data-id="${eid}">✏️ Editar</button>
-              <button class="delete-estudiante" data-id="${eid}">🗑️ Eliminar</button>
-            </div>
-          `;
-          listaEst.appendChild(item);
-        }); // cierre del forEach de estudiantes
+                <button class="star-btn remove-star" type="button" aria-label="Quitar estrella">−</button>
+                <span class="meta star-display">${estrellasHTML} (${estrellas}) - Nota: ${nota}</span>
+                <button class="star-btn add-star" type="button" aria-label="Agregar estrella">+</button>
+              </div>
+              <div class="acciones">
+                <button class="edit-estudiante" data-id="${eid}">✏️ Editar</button>
+                <button class="delete-estudiante" data-id="${eid}">🗑️ Eliminar</button>
+              </div>
+            `;
+            listaEst.appendChild(item);
+          });
 
-        claseCard.appendChild(listaEst);
-      } else {
-        const emptyEst = document.createElement("p");
-        emptyEst.className = "meta";
-        emptyEst.textContent = "No hay estudiantes en esta clase aún.";
-        claseCard.appendChild(emptyEst);
-      }
+          claseCard.appendChild(listaEst);
+        } else {
+          const emptyEst = document.createElement("p");
+          emptyEst.className = "meta";
+          emptyEst.textContent = "No hay estudiantes en esta clase aún.";
+          claseCard.appendChild(emptyEst);
+        }
 
-      listaClases.appendChild(claseCard);
-    }); // cierre del forEach de clases
+        listaClases.appendChild(claseCard);
+      });
 
-    card.appendChild(listaClases);
-  } else {
-    const emptyClase = document.createElement("p");
-    emptyClase.className = "meta";
-    emptyClase.textContent = "No hay clases registradas aún.";
-    card.appendChild(emptyClase);
+      card.appendChild(listaClases);
+    } else {
+      const emptyClase = document.createElement("p");
+      emptyClase.className = "meta";
+      emptyClase.textContent = "No hay clases registradas aún.";
+      card.appendChild(emptyClase);
+    }
+
+    container.appendChild(card);
+  });
+}
+
+// =========================
+// Event listeners delegados para acciones dinámicas (estrellas, editar, eliminar)
+// =========================
+document.getElementById("materias").addEventListener("click", e => {
+  const target = e.target;
+
+  // Agregar estrella
+  if (target.classList.contains("add-star")) {
+    const id = target.closest(".stars").dataset.id;
+    db.run(`UPDATE estudiantes SET estrellas = estrellas + 1 WHERE id = ?`, [id]);
+    saveDB();
+    renderMaterias();
   }
 
-  container.appendChild(card);
-}); // cierre del forEach de materias
-} // cierre de la función renderMaterias
+  // Quitar estrella
+  else if (target.classList.contains("remove-star")) {
+    const id = target.closest(".stars").dataset.id;
+    db.run(`UPDATE estudiantes SET estrellas = MAX(0, estrellas - 1) WHERE id = ?`, [id]);
+    saveDB();
+    renderMaterias();
+  }
+
+  // Eliminar materia
+  else if (target.classList.contains("delete-materia")) {
+    const id = target.dataset.id;
+    if (confirm("¿Eliminar materia y todo lo relacionado?")) {
+      db.run(`DELETE FROM estudiantes WHERE clase_id IN (SELECT id FROM clases WHERE materia_id = ?)`, [id]);
+      db.run(`DELETE FROM clases WHERE materia_id = ?`, [id]);
+      db.run(`DELETE FROM materias WHERE id = ?`, [id]);
+      saveDB();
+      renderMaterias();
+    }
+  }
+
+  // Eliminar clase
+  else if (target.classList.contains("delete-clase")) {
+    const id = target.dataset.id;
+    if (confirm("¿Eliminar clase y estudiantes?")) {
+      db.run(`DELETE FROM estudiantes WHERE clase_id = ?`, [id]);
+      db.run(`DELETE FROM clases WHERE id = ?`, [id]);
+      saveDB();
+      renderMaterias();
+    }
+  }
+
+  // Eliminar estudiante
+  else if (target.classList.contains("delete-estudiante")) {
+    const id = target.dataset.id;
+    if (confirm("¿Eliminar estudiante?")) {
+      db.run(`DELETE FROM estudiantes WHERE id = ?`, [id]);
+      saveDB();
+      renderMaterias();
+    }
+  }
+
+  // Editar materia (simple prompt)
+  else if (target.classList.contains("edit-materia")) {
+    const id = target.dataset.id;
+    const res = db.exec(`SELECT carrera, institucion FROM materias WHERE id = ?`, [id]);
+    if (res.length > 0) {
+      const [carrera, institucion] = res[0].values[0];
+      const newCarrera = prompt("Nueva carrera:", carrera);
+      const newInstitucion = prompt("Nueva institución:", institucion);
+      if (newCarrera && newInstitucion) {
+        db.run(`UPDATE materias SET carrera = ?, institucion = ? WHERE id = ?`, [newCarrera.trim(), newInstitucion.trim(), id]);
+        saveDB();
+        renderMaterias();
+      }
+    }
+  }
+
+  // Editar clase (simple prompt)
+  else if (target.classList.contains("edit-clase")) {
+    const id = target.dataset.id;
+    const res = db.exec(`SELECT nombre, fecha, grupo, seccion FROM clases WHERE id = ?`, [id]);
+    if (res.length > 0) {
+      const [nombre, fecha, grupo, seccion] = res[0].values[0];
+      const newNombre = prompt("Nuevo nombre:", nombre);
+      const newFecha = prompt("Nueva fecha:", fecha);
+      if (newNombre && newFecha) {
+        db.run(`UPDATE clases SET nombre = ?, fecha = ?, grupo = ?, seccion = ? WHERE id = ?`, [newNombre.trim(), newFecha, grupo, seccion, id]);
+        saveDB();
+        renderMaterias();
+      }
+    }
+  }
+
+  // Editar estudiante (simple prompt)
+  else if (target.classList.contains("edit-estudiante")) {
+    const id = target.dataset.id;
+    const res = db.exec(`SELECT nombre, apellido, cedula FROM estudiantes WHERE id = ?`, [id]);
+    if (res.length > 0) {
+      const [nombre, apellido, cedula] = res[0].values[0];
+      const newNombre = prompt("Nuevo nombre:", nombre);
+      const newApellido = prompt("Nuevo apellido:", apellido);
+      const newCedula = prompt("Nueva cédula:", cedula);
+      if (newNombre && newApellido && newCedula) {
+        db.run(`UPDATE estudiantes SET nombre = ?, apellido = ?, cedula = ? WHERE id = ?`, [newNombre.trim(), newApellido.trim(), newCedula.trim(), id]);
+        saveDB();
+        renderMaterias();
+      }
+    }
+  }
+});
 
 // =========================
 // Escapar texto para seguridad mínima (evita inyección HTML)
