@@ -1,98 +1,52 @@
-const CACHE = "clases-cache-v1";
-const BASE = "/clases";
-const ASSETS = [
-  `${BASE}/`,
-  `${BASE}/index.html`,
-  `${BASE}/style.css`,
-  `${BASE}/app.js`,
-  `${BASE}/manifest.json`,
-  `${BASE}/sql-wasm.js`,
-  `${BASE}/sql-wasm.wasm`,
-  `${BASE}/icon-192.png`,
-  `${BASE}/icon-512.png`
+const CACHE_NAME = 'clases-app-v1';
+const urlsToCache = [
+  './', // Cachea la carpeta raíz (importante para el index.html)
+  './index.html',
+  './style.css',
+  './app.js',
+  './sql-wasm.js',
+  './sql-wasm.wasm', // ¡Crucial! El motor de la DB
+  // Aquí puedes añadir rutas a tus iconos si los tienes en manifest.json
 ];
 
-self.addEventListener("install", e => {
-  self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-});
-
-self.addEventListener("activate", e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(k => (k !== CACHE ? caches.delete(k) : null)))
-    )
-  );
-  clients.claim();
-});
-
-self.addEventListener("fetch", e => {
-  const req = e.request;
-
-  // Navegación: devolver index.html del caché como fallback
-  if (req.mode === "navigate") {
-    e.respondWith(
-      caches.match(`${BASE}/index.html`).then(cached => {
-        return cached || fetch(req).catch(() => caches.match(`${BASE}/index.html`));
-      })
-    );
-    return;
-  }
-
-  // Recursos: offline-first con actualización en segundo plano
-  e.respondWith(
-    caches.match(req).then(cached => {
-      if (cached) return cached;
-      return fetch(req).then(res => {
-        const copy = res.clone();
-        if (res.ok && (res.type === "basic" || res.type === "cors")) {
-          caches.open(CACHE).then(c => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached);
-    })
-  );
-});
-
-
-// Activación: limpia versiones viejas y toma control
-self.addEventListener("activate", event => {
+// 1. Instalar y Cachear todos los recursos
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(k => (k !== CACHE_NAME ? caches.delete(k) : null)))
-    )
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Opened cache');
+        return cache.addAll(urlsToCache);
+      })
   );
-  clients.claim();
 });
 
-// Fetch: estrategia offline-first con fallback de navegación
-self.addEventListener("fetch", event => {
-  const req = event.request;
-
-  // Si es navegación (HTML), intenta caché y usa index.html como fallback
-  if (req.mode === "navigate") {
-    event.respondWith(
-      caches.match("/index.html").then(cached => {
-        return cached || fetch(req).catch(() => caches.match("/index.html"));
-      })
-    );
-    return;
-  }
-
-  // Para otros recursos: sirve desde caché, si no existe, intenta red
+// 2. Servir los recursos desde la caché si están disponibles
+self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(req).then(cached => {
-      if (cached) return cached;
-      return fetch(req)
-        .then(res => {
-          // Clona y guarda en caché si es una respuesta válida (status 200, basic)
-          const copy = res.clone();
-          if (res.ok && res.type === "basic") {
-            caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
+    caches.match(event.request)
+      .then(response => {
+        // Devuelve el recurso desde la caché si lo encuentra
+        if (response) {
+          return response;
+        }
+        // Si no está en caché, va a la red (necesita internet)
+        return fetch(event.request);
+      })
+  );
+});
+
+// 3. Limpiar cachés antiguas (Opcional, pero recomendado)
+self.addEventListener('activate', event => {
+  const cacheWhitelist = [CACHE_NAME];
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            return caches.delete(cacheName);
           }
-          return res;
         })
-        .catch(() => cached); // fallback a caché si la red falla
+      );
     })
   );
 });
