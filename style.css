@@ -204,4 +204,17 @@
     color: #333;       /* color visible */
   }
   
+/* Estilo base para el formulario que quieres que ocupe menos espacio */
+#formMateria .grid {
+    display: flex;
+    flex-direction: column; /* Apila los inputs */
+    gap: 10px; /* Espacio entre inputs */
+}
+
+/* Para pantallas medianas o grandes (opcional, si quieres que se vean en línea) */
+@media (min-width: 600px) {
+    #formMateria .grid {
+        flex-direction: row;
+    }
+}
   
